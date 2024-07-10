@@ -1,9 +1,8 @@
 use lib::{
-    aquahash,
     avalanche_chart::{
         compute_avalanche_chart, generate_counting, generate_random, generate_single_1_bit,
     },
-    cityhash128, fnv1a, goodhart, meowhash, metrohash128, murmur3, xxhash3,
+    mixers::{aquahash, cityhash128, fnv1a, goodhart, meowhash, metrohash128, murmur3, xxhash3},
 };
 
 /// (name, mixing_function, input_size_in_bytes, output_size_in_bytes, digest_size_in_bytes, rounds)
