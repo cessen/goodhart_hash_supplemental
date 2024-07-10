@@ -1,0 +1,16 @@
+[package]
+name = "goodhart_hash_supplemental"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "lib"
+path = "src/lib.rs"
+
+[[bin]]
+name="mix_bias"
+path="src/bin/mix_bias.rs"
+
+[dependencies]
+nanorand = "0.7.0"
+png_encode_mini = "0.1.2"
