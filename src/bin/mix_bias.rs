@@ -5,121 +5,127 @@ use lib::{
     mixers::{aquahash, cityhash128, fnv1a, goodhart, meowhash, metrohash128, murmur3, xxhash3},
 };
 
+struct Mixer<'a> {
+    name: &'a str,
+    mix_function: &'a dyn Fn(&[u8], &mut [u8]),
+    input_size: usize,  // In bytes.
+    output_size: usize, // In bytes.
+    digest_size: usize, // In bytes.
+}
+
 /// (name, mixing_function, input_size_in_bytes, output_size_in_bytes, digest_size_in_bytes, rounds)
 ///
-/// The rounds is how many rounds to use in computing the avalanche statistics.
-/// Higher numbers will give lower variance in the results, but also be slower.
-/// For mixers that are already slow, you may want to reduce the number of
-/// rounds.
-const MIXERS: &[(&str, &dyn Fn(&[u8], &mut [u8]), usize, usize, usize, usize)] = &[
-    (
-        "Goodhart mixer, 12 rounds",
-        &goodhart::mix_input,
-        goodhart::IN_SIZE_BYTES,
-        goodhart::OUT_SIZE_BYTES,
-        goodhart::DIGEST_SIZE_BYTES,
-        128 * 128,
-    ),
-    (
-        "MeowHash v0.5 absorber",
-        &meowhash::mix_input,
-        meowhash::IN_SIZE_BYTES,
-        meowhash::OUT_SIZE_BYTES,
-        meowhash::DIGEST_SIZE_BYTES,
-        128 * 64,
-    ),
-    (
-        "Murmur3 accumulator",
-        &murmur3::mix_input,
-        murmur3::IN_SIZE_BYTES,
-        murmur3::OUT_SIZE_BYTES,
-        murmur3::DIGEST_SIZE_BYTES,
-        128 * 128,
-    ),
-    (
-        "CityHash128 accumulator",
-        &cityhash128::mix_input,
-        cityhash128::IN_SIZE_BYTES,
-        cityhash128::OUT_SIZE_BYTES,
-        cityhash128::DIGEST_SIZE_BYTES,
-        128 * 64,
-    ),
-    (
-        "MetroHash128 accumulator",
-        &metrohash128::mix_input,
-        metrohash128::IN_SIZE_BYTES,
-        metrohash128::OUT_SIZE_BYTES,
-        metrohash128::DIGEST_SIZE_BYTES,
-        128 * 128,
-    ),
-    (
-        "xxhash3 accumulator",
-        &xxhash3::mix_input,
-        xxhash3::IN_SIZE_BYTES,
-        xxhash3::OUT_SIZE_BYTES,
-        xxhash3::DIGEST_SIZE_BYTES,
-        128 * 64,
-    ),
-    (
-        "AquaHash accumulator",
-        &aquahash::mix_input,
-        aquahash::IN_SIZE_BYTES,
-        aquahash::OUT_SIZE_BYTES,
-        aquahash::DIGEST_SIZE_BYTES,
-        128 * 64,
-    ),
-    (
-        "FNV1a (128-bit) accumulator",
-        &fnv1a::mix_input,
-        fnv1a::IN_SIZE_BYTES,
-        fnv1a::OUT_SIZE_BYTES,
-        fnv1a::DIGEST_SIZE_BYTES,
-        128 * 128,
-    ),
+/// The rounds is how many rounds to use in computing the random-input avalanche statistics.  More rounds will give lower variance in the result.  Note that the patterned inputs have a fix number of rounds due to their nature: more rounds doesn't reduce variance, it changes what you're measuring.
+const MIXERS: &[Mixer] = &[
+    Mixer {
+        name: "Goodhart mixer, 12 rounds",
+        mix_function: &goodhart::mix_input,
+        input_size: goodhart::IN_SIZE_BYTES,
+        output_size: goodhart::OUT_SIZE_BYTES,
+        digest_size: goodhart::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
+        name: "MeowHash v0.5 absorber",
+        mix_function: &meowhash::mix_input,
+        input_size: meowhash::IN_SIZE_BYTES,
+        output_size: meowhash::OUT_SIZE_BYTES,
+        digest_size: meowhash::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
+        name: "Murmur3 accumulator",
+        mix_function: &murmur3::mix_input,
+        input_size: murmur3::IN_SIZE_BYTES,
+        output_size: murmur3::OUT_SIZE_BYTES,
+        digest_size: murmur3::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
+        name: "CityHash128 accumulator",
+        mix_function: &cityhash128::mix_input,
+        input_size: cityhash128::IN_SIZE_BYTES,
+        output_size: cityhash128::OUT_SIZE_BYTES,
+        digest_size: cityhash128::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
+        name: "MetroHash128 accumulator",
+        mix_function: &metrohash128::mix_input,
+        input_size: metrohash128::IN_SIZE_BYTES,
+        output_size: metrohash128::OUT_SIZE_BYTES,
+        digest_size: metrohash128::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
+        name: "xxhash3 accumulator",
+        mix_function: &xxhash3::mix_input,
+        input_size: xxhash3::IN_SIZE_BYTES,
+        output_size: xxhash3::OUT_SIZE_BYTES,
+        digest_size: xxhash3::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
+        name: "AquaHash accumulator",
+        mix_function: &aquahash::mix_input,
+        input_size: aquahash::IN_SIZE_BYTES,
+        output_size: aquahash::OUT_SIZE_BYTES,
+        digest_size: aquahash::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
+        name: "FNV1a (128-bit) accumulator",
+        mix_function: &fnv1a::mix_input,
+        input_size: fnv1a::IN_SIZE_BYTES,
+        output_size: fnv1a::OUT_SIZE_BYTES,
+        digest_size: fnv1a::DIGEST_SIZE_BYTES,
+    },
 ];
 
 fn main() {
-    for (name, mixer, in_size, out_size, digest_size, rounds) in MIXERS.iter().copied() {
+    // for (name, mixer, in_size, out_size, digest_size, rounds) in MIXERS.iter().copied() {
+    for mixer in MIXERS.iter() {
         println!("\n================================");
-        println!("{}", name);
+        println!("{}", mixer.name);
         println!("\nPattern: random");
         let chart = compute_avalanche_chart(
             generate_random,
-            mixer,
-            in_size,
-            out_size,
-            digest_size,
-            rounds,
+            mixer.mix_function,
+            mixer.input_size,
+            mixer.output_size,
+            mixer.digest_size,
+            1 << 16,
         );
         chart.print_report();
-        chart.write_png(&format!("{} - random.png", name)).unwrap();
+        chart
+            .write_png(&format!("{} - random.png", mixer.name))
+            .unwrap();
 
         println!("\nPattern: counting");
         let chart = compute_avalanche_chart(
             generate_counting,
-            mixer,
-            in_size,
-            out_size,
-            digest_size,
-            1 << 12,
+            mixer.mix_function,
+            mixer.input_size,
+            mixer.output_size,
+            mixer.digest_size,
+            1 << 16,
         );
         chart.print_report();
         chart
-            .write_png(&format!("{} - counting.png", name))
+            .write_png(&format!("{} - counting.png", mixer.name))
             .unwrap();
 
+        // NOTE: because this test has a small, fixed number of rounds by its
+        // nature, the generated statistics should be interpreted a little
+        // differently. In particular, even a very good mixing function is
+        // unlikely to achieve "perfect" avalanche by this measure, purely
+        // because it's impossible to collect enough samples to reduce variance
+        // enough.
         println!("\nPattern: single-bit");
         let chart = compute_avalanche_chart(
             generate_single_1_bit,
-            mixer,
-            in_size,
-            out_size,
-            digest_size,
-            out_size * 8,
+            mixer.mix_function,
+            mixer.input_size,
+            mixer.output_size,
+            mixer.digest_size,
+            mixer.output_size * 8,
         );
         chart.print_report();
         chart
-            .write_png(&format!("{} - single-bit.png", name))
+            .write_png(&format!("{} - single-bit.png", mixer.name))
             .unwrap();
     }
 }
