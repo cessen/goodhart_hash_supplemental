@@ -72,33 +72,38 @@ pub fn mix_input(in_bytes: &[u8], out_bytes: &mut [u8]) {
 
     // The absorber.
     //
-    // We're being a bit generous here by considering a round to be two mix
-    // calls (actually incorporating two blocks) rather than one.  The rationale
-    // is that a second mix call (with meowhash's shifting of xmm slots) doesn't
-    // incoporate its input block into all of the xmm slots that the first mix
-    // call did.  So in theory within two mixes a block could be diffused enough
-    // within those unshared slots.
+    // We're being a bit generous here by considering a round to be three
+    // mix calls (actually incorporating three blocks) rather than one.  The
+    // rationale is that due to the way MeowHash shuffles its use of the xmm
+    // slots, this is the minimum number of mix calls needed to ensure that
+    // every xmm slot will have another input block incorporated into it (it's
+    // actually the fourth mix call that touches the final xmm slot, but it does
+    // so before doing any mixing on that slot).  Since what we care about is
+    // the complexity of inter-block bit relationships, that's what's needed
+    // here to be conservative.
     //
-    // This ends up being moot, however, since a block doesn't reach even close
-    // to 128 bits of min diffusion within two mix calls anyway. That takes six
-    // mix calls (and more for patterned inputs).
+    // Note that it's possible the situation is worse than this conservative
+    // test indicates--but asserting that would require more analysis than I
+    // have the energy for.
+    //
+    // Regardless, it's a bit moot since an input block doesn't reach even close
+    // to 128 bits of min diffusion within three mix calls anyway.  That takes
+    // six mix calls (and more for patterned inputs).
     //
     // You can uncomment subsequent rounds below to play with how much diffusion
-    // you get per block.
+    // you get per subsequent input block.
     unsafe {
         // Round 1.
         mix!(xmm0, xmm4, xmm6, xmm1, xmm2, in_bytes.as_ptr());
         mix!(xmm1, xmm5, xmm7, xmm2, xmm3, zero_bytes.as_ptr());
+        mix!(xmm2, xmm6, xmm0, xmm3, xmm4, zero_bytes.as_ptr());
 
         // // Round 2.
-        // mix!(xmm2, xmm6, xmm0, xmm3, xmm4, zero_bytes.as_ptr());
         // mix!(xmm3, xmm7, xmm1, xmm4, xmm5, zero_bytes.as_ptr());
-
-        // // Round 3.
         // mix!(xmm4, xmm0, xmm2, xmm5, xmm6, zero_bytes.as_ptr());
         // mix!(xmm5, xmm1, xmm3, xmm6, xmm7, zero_bytes.as_ptr());
 
-        // // Round 4.
+        // // Round 3.
         // mix!(xmm6, xmm2, xmm4, xmm7, xmm0, zero_bytes.as_ptr());
         // mix!(xmm7, xmm3, xmm5, xmm0, xmm1, zero_bytes.as_ptr());
 
@@ -107,16 +112,14 @@ pub fn mix_input(in_bytes: &[u8], out_bytes: &mut [u8]) {
         // // Round 1.
         // mix!(xmm0, xmm4, xmm6, xmm1, xmm2, zero_bytes.as_ptr());
         // mix!(xmm1, xmm5, xmm7, xmm2, xmm3, zero_bytes.as_ptr());
+        // mix!(xmm2, xmm6, xmm0, xmm3, xmm4, zero_bytes.as_ptr());
 
         // // Round 2.
-        // mix!(xmm2, xmm6, xmm0, xmm3, xmm4, zero_bytes.as_ptr());
         // mix!(xmm3, xmm7, xmm1, xmm4, xmm5, zero_bytes.as_ptr());
-
-        // // Round 3.
         // mix!(xmm4, xmm0, xmm2, xmm5, xmm6, zero_bytes.as_ptr());
         // mix!(xmm5, xmm1, xmm3, xmm6, xmm7, zero_bytes.as_ptr());
 
-        // // Round 4.
+        // // Round 3.
         // mix!(xmm6, xmm2, xmm4, xmm7, xmm0, zero_bytes.as_ptr());
         // mix!(xmm7, xmm3, xmm5, xmm0, xmm1, zero_bytes.as_ptr());
     }
