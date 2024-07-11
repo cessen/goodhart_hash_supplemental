@@ -13,9 +13,6 @@ struct Mixer<'a> {
     digest_size: usize, // In bytes.
 }
 
-/// (name, mixing_function, input_size_in_bytes, output_size_in_bytes, digest_size_in_bytes, rounds)
-///
-/// The rounds is how many rounds to use in computing the random-input avalanche statistics.  More rounds will give lower variance in the result.  Note that the patterned inputs have a fix number of rounds due to their nature: more rounds doesn't reduce variance, it changes what you're measuring.
 const MIXERS: &[Mixer] = &[
     Mixer {
         name: "Goodhart mixer, 12 rounds",
