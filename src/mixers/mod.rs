@@ -5,4 +5,6 @@ pub mod goodhart;
 pub mod meowhash;
 pub mod metrohash128;
 pub mod murmur3;
+pub mod skein;
+pub mod tenthash;
 pub mod xxhash3;

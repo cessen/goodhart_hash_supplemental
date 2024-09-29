@@ -2,7 +2,10 @@ use lib::{
     avalanche_chart::{
         compute_avalanche_chart, generate_counting, generate_random, generate_single_1_bit,
     },
-    mixers::{aquahash, cityhash128, fnv1a, goodhart, meowhash, metrohash128, murmur3, xxhash3},
+    mixers::{
+        aquahash, cityhash128, fnv1a, goodhart, meowhash, metrohash128, murmur3, skein, tenthash,
+        xxhash3,
+    },
 };
 
 struct Mixer<'a> {
@@ -20,6 +23,20 @@ const MIXERS: &[Mixer] = &[
         input_size: goodhart::IN_SIZE_BYTES,
         output_size: goodhart::OUT_SIZE_BYTES,
         digest_size: goodhart::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
+        name: "TentHash",
+        mix_function: &tenthash::mix_input,
+        input_size: tenthash::IN_SIZE_BYTES,
+        output_size: tenthash::OUT_SIZE_BYTES,
+        digest_size: tenthash::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
+        name: "Skein, 7 rounds",
+        mix_function: &skein::mix_input,
+        input_size: skein::IN_SIZE_BYTES,
+        output_size: skein::OUT_SIZE_BYTES,
+        digest_size: skein::DIGEST_SIZE_BYTES,
     },
     Mixer {
         name: "MeowHash v0.5 absorber",
