@@ -1,3 +1,4 @@
+pub mod aes;
 pub mod aquahash;
 pub mod cityhash128;
 pub mod fnv1a;

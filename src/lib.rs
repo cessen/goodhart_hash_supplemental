@@ -1,2 +1,2 @@
-pub mod avalanche_chart;
 pub mod mixers;
+pub mod stats;

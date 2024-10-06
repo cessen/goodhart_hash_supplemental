@@ -1,11 +1,9 @@
 use lib::{
-    avalanche_chart::{
-        compute_avalanche_chart, generate_counting, generate_random, generate_single_1_bit,
-    },
     mixers::{
-        aquahash, cityhash128, fnv1a, goodhart, meowhash, metrohash128, murmur3, skein, tenthash,
-        xxhash3,
+        aes, aquahash, cityhash128, fnv1a, goodhart, meowhash, metrohash128, murmur3, skein,
+        tenthash, xxhash3,
     },
+    stats::{compute_stats, generate_counting, generate_random, generate_single_1_bit},
 };
 
 struct Mixer<'a> {
@@ -17,6 +15,13 @@ struct Mixer<'a> {
 }
 
 const MIXERS: &[Mixer] = &[
+    Mixer {
+        name: "AES, 2 rounds",
+        mix_function: &aes::mix_input,
+        input_size: aes::IN_SIZE_BYTES,
+        output_size: aes::OUT_SIZE_BYTES,
+        digest_size: aes::DIGEST_SIZE_BYTES,
+    },
     Mixer {
         name: "Goodhart mixer, 12 rounds",
         mix_function: &goodhart::mix_input,
@@ -90,37 +95,83 @@ const MIXERS: &[Mixer] = &[
 ];
 
 fn main() {
+    let mut do_avalanche = false;
+    let mut do_bic = false;
+    let mut name_filters = Vec::new();
+
+    for arg in std::env::args().skip(1) {
+        if !arg.starts_with("-") {
+            name_filters.push(arg.to_lowercase());
+            continue;
+        }
+
+        if arg == "--avalanche" {
+            do_avalanche = true;
+            continue;
+        }
+
+        if arg == "--bic" {
+            do_bic = true;
+            continue;
+        }
+    }
+
+    // If no tests were selected, select them all.
+    if !do_avalanche && !do_bic {
+        do_avalanche = true;
+        do_bic = true;
+    }
+
     // for (name, mixer, in_size, out_size, digest_size, rounds) in MIXERS.iter().copied() {
     for mixer in MIXERS.iter() {
+        if !name_filters.is_empty() {
+            let lower_name = mixer.name.to_lowercase();
+
+            if !name_filters
+                .iter()
+                .any(|filter| lower_name.contains(filter))
+            {
+                continue;
+            }
+        }
+
         println!("\n================================");
         println!("{}", mixer.name);
         println!("\nPattern: random");
-        let chart = compute_avalanche_chart(
+        let stats = compute_stats(
             generate_random,
             mixer.mix_function,
             mixer.input_size,
             mixer.output_size,
             mixer.digest_size,
             1 << 16,
+            do_avalanche,
+            do_bic,
         );
-        chart.print_report();
-        chart
-            .write_png(&format!("{} - random.png", mixer.name))
-            .unwrap();
+        stats.print_report();
+        if do_avalanche {
+            stats
+                .write_avalanche_png(&format!("{} - random.png", mixer.name))
+                .unwrap();
+        }
 
         println!("\nPattern: counting");
-        let chart = compute_avalanche_chart(
+        let stats = compute_stats(
             generate_counting,
             mixer.mix_function,
             mixer.input_size,
             mixer.output_size,
             mixer.digest_size,
             1 << 16,
+            do_avalanche,
+            do_bic,
         );
-        chart.print_report();
-        chart
-            .write_png(&format!("{} - counting.png", mixer.name))
-            .unwrap();
+        stats.print_report();
+        if do_avalanche {
+            stats
+                .write_avalanche_png(&format!("{} - counting.png", mixer.name))
+                .unwrap();
+        }
 
         // NOTE: because this test has a small, fixed number of rounds by its
         // nature, the generated statistics should be interpreted a little
@@ -129,17 +180,21 @@ fn main() {
         // because it's impossible to collect enough samples to reduce variance
         // enough.
         println!("\nPattern: single-bit");
-        let chart = compute_avalanche_chart(
+        let stats = compute_stats(
             generate_single_1_bit,
             mixer.mix_function,
             mixer.input_size,
             mixer.output_size,
             mixer.digest_size,
             mixer.output_size * 8,
+            do_avalanche,
+            do_bic,
         );
-        chart.print_report();
-        chart
-            .write_png(&format!("{} - single-bit.png", mixer.name))
-            .unwrap();
+        stats.print_report();
+        if do_avalanche {
+            stats
+                .write_avalanche_png(&format!("{} - single-bit.png", mixer.name))
+                .unwrap();
+        }
     }
 }

@@ -2,7 +2,7 @@ use std::{fs::File, path::Path};
 
 use nanorand::{Rng, WyRand};
 
-pub struct AvalancheChart {
+pub struct Stats {
     pub input_bit_len: usize,
     pub output_bit_len: usize,
     pub digest_bit_len: usize,
@@ -13,32 +13,50 @@ pub struct AvalancheChart {
 
     // `input_bit_len * output_bit_len` long.  Each element is a count of the
     // number of bit flips for a given in/out bit pairing.
-    pub chart: Vec<u32>,
+    pub avalanche_chart: Vec<u32>,
+
+    // For every input bit, the BIC quadrants for each pair of output bits.
+    pub bic_chart: Vec<[u32; 4]>,
 }
 
-impl AvalancheChart {
-    pub fn new(input_bit_len: usize, output_bit_len: usize, digest_bit_len: usize) -> Self {
+impl Stats {
+    pub fn new(
+        input_bit_len: usize,
+        output_bit_len: usize,
+        digest_bit_len: usize,
+        do_avalanche: bool,
+        do_bic: bool,
+    ) -> Self {
         Self {
             input_bit_len: input_bit_len,
             output_bit_len: output_bit_len,
             digest_bit_len: digest_bit_len,
             sample_count: 0,
-            chart: vec![0; input_bit_len * output_bit_len],
+            avalanche_chart: if do_avalanche {
+                vec![0; input_bit_len * output_bit_len]
+            } else {
+                Vec::new()
+            },
+            bic_chart: if do_bic {
+                vec![[0; 4]; input_bit_len * (input_bit_len * (output_bit_len - 1))]
+            } else {
+                Vec::new()
+            },
         }
     }
 
     pub fn accumulate(&mut self, in_bit: usize, out_bit: usize, flipped: bool) {
-        self.chart[in_bit * self.output_bit_len + out_bit] += flipped as u32;
+        self.avalanche_chart[in_bit * self.output_bit_len + out_bit] += flipped as u32;
     }
 
     pub fn get(&self, in_bit: usize, out_bit: usize) -> u32 {
-        self.chart[in_bit * self.output_bit_len + out_bit]
+        self.avalanche_chart[in_bit * self.output_bit_len + out_bit]
     }
 
     pub fn get_row(&self, in_bit: usize) -> &[u32] {
         let start = in_bit * self.output_bit_len;
         let end = start + self.output_bit_len;
-        &self.chart[start..end]
+        &self.avalanche_chart[start..end]
     }
 
     pub fn row_diffusion(&self, in_bit: usize) -> f64 {
@@ -61,18 +79,18 @@ impl AvalancheChart {
         let norm = 1.0 / self.sample_count as f64;
 
         let bias_sum: f64 = self
-            .chart
+            .avalanche_chart
             .iter()
             .map(|&flips| p_to_bias(flips as f64 * norm))
             .sum();
-        bias_sum / self.chart.len() as f64
+        bias_sum / self.avalanche_chart.len() as f64
     }
 
     pub fn min_bias(&self) -> f64 {
         let norm = 1.0 / self.sample_count as f64;
 
         let mut min_bias = 0.0f64;
-        for &flips in &self.chart {
+        for &flips in &self.avalanche_chart {
             let bias = p_to_bias(flips as f64 * norm);
             min_bias = min_bias.min(bias);
         }
@@ -83,7 +101,7 @@ impl AvalancheChart {
         let norm = 1.0 / self.sample_count as f64;
 
         let mut max_bias = 0.0f64;
-        for &flips in &self.chart {
+        for &flips in &self.avalanche_chart {
             let bias = p_to_bias(flips as f64 * norm);
             max_bias = max_bias.max(bias);
         }
@@ -138,9 +156,50 @@ impl AvalancheChart {
         max_entropy
     }
 
+    pub fn row_bic_avg_deviation(&self, in_bit_idx: usize) -> f64 {
+        let stride = self.input_bit_len * (self.output_bit_len - 1);
+        let start = in_bit_idx * stride;
+        let end = start + stride;
+        let bic = &self.bic_chart[start..end];
+
+        let mut sum = 0.0;
+        for [a, b, c, d] in bic.iter() {
+            let min = *a.min(b).min(c).min(d);
+            let max = *a.max(b).max(c).max(d);
+
+            sum += (max - min) as f64 / max as f64;
+        }
+        sum / stride as f64
+    }
+
+    pub fn min_bic_deviation(&self) -> f64 {
+        let mut n = 999.0_f64;
+        for i in 0..self.input_bit_len {
+            n = n.min(self.row_bic_avg_deviation(i));
+        }
+        n
+    }
+
+    pub fn avg_bic_deviation(&self) -> f64 {
+        let mut n = 0.0;
+        for i in 0..self.input_bit_len {
+            n += self.row_bic_avg_deviation(i);
+        }
+        n / self.input_bit_len as f64
+    }
+
+    pub fn max_bic_deviation(&self) -> f64 {
+        let mut n = 0.0_f64;
+        for i in 0..self.input_bit_len {
+            n = n.max(self.row_bic_avg_deviation(i));
+        }
+        n
+    }
+
     pub fn print_report(&self) {
-        println!(
-            "    Bias:
+        if !self.avalanche_chart.is_empty() {
+            println!(
+                "    Bias:
         Min: {:0.2}
         Avg: {:0.2}
         Max: {:0.2}
@@ -152,24 +211,37 @@ impl AvalancheChart {
         Min: {:0.1} bits
         Avg: {:0.1} bits
         Max: {:0.1} bits",
-            self.min_bias(),
-            self.average_bias(),
-            self.max_bias(),
-            self.digest_bit_len,
-            self.min_input_bit_diffusion(),
-            self.avg_input_bit_diffusion(),
-            self.max_input_bit_diffusion(),
-            self.digest_bit_len,
-            self.min_input_bit_entropy(),
-            self.avg_input_bit_entropy(),
-            self.max_input_bit_entropy(),
-        );
+                self.min_bias(),
+                self.average_bias(),
+                self.max_bias(),
+                self.digest_bit_len,
+                self.min_input_bit_diffusion(),
+                self.avg_input_bit_diffusion(),
+                self.max_input_bit_diffusion(),
+                self.digest_bit_len,
+                self.min_input_bit_entropy(),
+                self.avg_input_bit_entropy(),
+                self.max_input_bit_entropy(),
+            );
+        }
+
+        if !self.bic_chart.is_empty() {
+            println!(
+                "    BIC deviation:
+        Min: {:0.4}
+        Avg: {:0.4}
+        Max: {:0.4}",
+                self.min_bic_deviation(),
+                self.avg_bic_deviation(),
+                self.max_bic_deviation(),
+            );
+        }
     }
 
-    pub fn write_png<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
+    pub fn write_avalanche_png<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
         let mut pixels = Vec::new();
 
-        for bit in self.chart.iter().copied() {
+        for bit in self.avalanche_chart.iter().copied() {
             let v = (bit * 255 / self.sample_count as u32).min(255) as u8;
             pixels.extend_from_slice(&[v, v, v, 255]);
         }
@@ -201,19 +273,27 @@ impl AvalancheChart {
 ///   is a component of.  This is not actually used in any computations, and is
 ///   just provided as information in the final printouts.
 /// - `rounds`: how many test rounds to perform to produce the estimated chart.
-pub fn compute_avalanche_chart<F1, F2>(
+pub fn compute_stats<F1, F2>(
     generate_input: F1,
     mix: F2,
     input_size: usize,
     output_size: usize,
     digest_size: usize,
     rounds: usize,
-) -> AvalancheChart
+    do_avalanche: bool,
+    do_bic: bool,
+) -> Stats
 where
     F1: Fn(usize, &mut [u8]),
     F2: Fn(&[u8], &mut [u8]),
 {
-    let mut chart = AvalancheChart::new(input_size * 8, output_size * 8, digest_size * 8);
+    let mut chart = Stats::new(
+        input_size * 8,
+        output_size * 8,
+        digest_size * 8,
+        do_avalanche,
+        do_bic,
+    );
 
     let mut input = vec![0u8; input_size];
     let mut output = vec![0u8; output_size];
@@ -229,12 +309,47 @@ where
             input_tweaked[in_bit_idx / 8] ^= 1 << (in_bit_idx % 8);
             mix(&input_tweaked[..], &mut output_tweaked[..]);
 
-            for out_bit_idx in 0..(output_size * 8) {
-                let i = out_bit_idx / 8;
-                let mask = 1 << (out_bit_idx % 8);
-                let flipped = (output[i] & mask) != (output_tweaked[i] & mask);
+            // Avalanche.
+            if do_avalanche {
+                for out_bit_idx in 0..(output_size * 8) {
+                    let i = out_bit_idx / 8;
+                    let mask = 1 << (out_bit_idx % 8);
+                    let flipped = (output[i] & mask) != (output_tweaked[i] & mask);
 
-                chart.accumulate(in_bit_idx, out_bit_idx, flipped);
+                    chart.accumulate(in_bit_idx, out_bit_idx, flipped);
+                }
+            }
+
+            // Bit independence criterion.
+            if do_bic {
+                for i in 0..(output_size * 8) {
+                    for j in 0..(output_size * 8 - 1) {
+                        let i_b = (i + j + 1) % (output_size * 8);
+
+                        let byte_a = i / 8;
+                        let mask_a = 1 << (i % 8);
+                        let byte_b = i_b / 8;
+                        let mask_b = 1 << (i_b % 8);
+
+                        let flipped_a =
+                            (output[byte_a] & mask_a) != (output_tweaked[byte_a] & mask_a);
+                        let flipped_b =
+                            (output[byte_b] & mask_b) != (output_tweaked[byte_b] & mask_b);
+
+                        let both = flipped_a && flipped_b;
+                        let neither = !flipped_a && !flipped_b;
+                        let only_left = flipped_a && !flipped_b;
+                        let only_right = !flipped_a && flipped_b;
+
+                        let stride = (input_size * 8) * (output_size * 8 - 1);
+                        let k = (in_bit_idx * stride) + (i * (output_size * 8 - 1)) + j;
+
+                        chart.bic_chart[k][0] += both as u32;
+                        chart.bic_chart[k][1] += neither as u32;
+                        chart.bic_chart[k][2] += only_left as u32;
+                        chart.bic_chart[k][3] += only_right as u32;
+                    }
+                }
             }
         }
 
