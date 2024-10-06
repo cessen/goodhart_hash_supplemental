@@ -199,7 +199,7 @@ fn main() {
             stats.print_report();
             if do_avalanche {
                 stats
-                    .write_avalanche_png(&format!("{} - random.png", mixer.name))
+                    .write_avalanche_png(&format!("{} - {}.png", mixer.name, pattern.name))
                     .unwrap();
             }
         }
