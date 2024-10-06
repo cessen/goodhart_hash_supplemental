@@ -1,7 +1,8 @@
+#[allow(unused_imports)]
 use lib::{
     mixers::{
         aes, aquahash, cityhash128, fnv1a, goodhart, meowhash, metrohash128, murmur3, skein,
-        tenthash, xxhash3,
+        spookyhash2, tenthash, xxhash3,
     },
     stats::{
         compute_stats, generate_bit_combinations, generate_counting, generate_random,
@@ -26,39 +27,11 @@ const MIXERS: &[Mixer] = &[
         digest_size: aes::DIGEST_SIZE_BYTES,
     },
     Mixer {
-        name: "Goodhart mixer, 12 rounds",
-        mix_function: &goodhart::mix_input,
-        input_size: goodhart::IN_SIZE_BYTES,
-        output_size: goodhart::OUT_SIZE_BYTES,
-        digest_size: goodhart::DIGEST_SIZE_BYTES,
-    },
-    Mixer {
-        name: "TentHash",
-        mix_function: &tenthash::mix_input,
-        input_size: tenthash::IN_SIZE_BYTES,
-        output_size: tenthash::OUT_SIZE_BYTES,
-        digest_size: tenthash::DIGEST_SIZE_BYTES,
-    },
-    Mixer {
-        name: "Skein, 7 rounds",
-        mix_function: &skein::mix_input,
-        input_size: skein::IN_SIZE_BYTES,
-        output_size: skein::OUT_SIZE_BYTES,
-        digest_size: skein::DIGEST_SIZE_BYTES,
-    },
-    Mixer {
-        name: "MeowHash v0.5 absorber",
-        mix_function: &meowhash::mix_input,
-        input_size: meowhash::IN_SIZE_BYTES,
-        output_size: meowhash::OUT_SIZE_BYTES,
-        digest_size: meowhash::DIGEST_SIZE_BYTES,
-    },
-    Mixer {
-        name: "Murmur3 accumulator",
-        mix_function: &murmur3::mix_input,
-        input_size: murmur3::IN_SIZE_BYTES,
-        output_size: murmur3::OUT_SIZE_BYTES,
-        digest_size: murmur3::DIGEST_SIZE_BYTES,
+        name: "AquaHash accumulator",
+        mix_function: &aquahash::mix_input,
+        input_size: aquahash::IN_SIZE_BYTES,
+        output_size: aquahash::OUT_SIZE_BYTES,
+        digest_size: aquahash::DIGEST_SIZE_BYTES,
     },
     Mixer {
         name: "CityHash128 accumulator",
@@ -68,6 +41,27 @@ const MIXERS: &[Mixer] = &[
         digest_size: cityhash128::DIGEST_SIZE_BYTES,
     },
     Mixer {
+        name: "FNV1a (128-bit) accumulator",
+        mix_function: &fnv1a::mix_input,
+        input_size: fnv1a::IN_SIZE_BYTES,
+        output_size: fnv1a::OUT_SIZE_BYTES,
+        digest_size: fnv1a::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
+        name: "Goodhart mixer, 12 rounds",
+        mix_function: &goodhart::mix_input,
+        input_size: goodhart::IN_SIZE_BYTES,
+        output_size: goodhart::OUT_SIZE_BYTES,
+        digest_size: goodhart::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
+        name: "MeowHash v0.5 absorber",
+        mix_function: &meowhash::mix_input,
+        input_size: meowhash::IN_SIZE_BYTES,
+        output_size: meowhash::OUT_SIZE_BYTES,
+        digest_size: meowhash::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
         name: "MetroHash128 accumulator",
         mix_function: &metrohash128::mix_input,
         input_size: metrohash128::IN_SIZE_BYTES,
@@ -75,25 +69,39 @@ const MIXERS: &[Mixer] = &[
         digest_size: metrohash128::DIGEST_SIZE_BYTES,
     },
     Mixer {
+        name: "Murmur3 accumulator",
+        mix_function: &murmur3::mix_input,
+        input_size: murmur3::IN_SIZE_BYTES,
+        output_size: murmur3::OUT_SIZE_BYTES,
+        digest_size: murmur3::DIGEST_SIZE_BYTES,
+    },
+    // Mixer {
+    //     name: "Skein, 7 rounds (not representative of actual Skein)",
+    //     mix_function: &skein::mix_input,
+    //     input_size: skein::IN_SIZE_BYTES,
+    //     output_size: skein::OUT_SIZE_BYTES,
+    //     digest_size: skein::DIGEST_SIZE_BYTES,
+    // },
+    Mixer {
+        name: "SpookyHash 2",
+        mix_function: &spookyhash2::mix_input,
+        input_size: spookyhash2::IN_SIZE_BYTES,
+        output_size: spookyhash2::OUT_SIZE_BYTES,
+        digest_size: spookyhash2::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
+        name: "TentHash",
+        mix_function: &tenthash::mix_input,
+        input_size: tenthash::IN_SIZE_BYTES,
+        output_size: tenthash::OUT_SIZE_BYTES,
+        digest_size: tenthash::DIGEST_SIZE_BYTES,
+    },
+    Mixer {
         name: "xxhash3 accumulator",
         mix_function: &xxhash3::mix_input,
         input_size: xxhash3::IN_SIZE_BYTES,
         output_size: xxhash3::OUT_SIZE_BYTES,
         digest_size: xxhash3::DIGEST_SIZE_BYTES,
-    },
-    Mixer {
-        name: "AquaHash accumulator",
-        mix_function: &aquahash::mix_input,
-        input_size: aquahash::IN_SIZE_BYTES,
-        output_size: aquahash::OUT_SIZE_BYTES,
-        digest_size: aquahash::DIGEST_SIZE_BYTES,
-    },
-    Mixer {
-        name: "FNV1a (128-bit) accumulator",
-        mix_function: &fnv1a::mix_input,
-        input_size: fnv1a::IN_SIZE_BYTES,
-        output_size: fnv1a::OUT_SIZE_BYTES,
-        digest_size: fnv1a::DIGEST_SIZE_BYTES,
     },
 ];
 

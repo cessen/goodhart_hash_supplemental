@@ -7,6 +7,7 @@ pub const IN_SIZE_BYTES: usize = 128 / 8;
 pub const OUT_SIZE_BYTES: usize = 128 / 8;
 pub const DIGEST_SIZE_BYTES: usize = 128 / 8;
 
+// Some random numbers, for playing with the number of rounds below.
 const KEYS: &[u128] = &[
     0x5aee66ffbc9d5f254dd19917b03fb552,
     0xb625245574d76546f7007e2431b3c833,
@@ -18,6 +19,12 @@ const KEYS: &[u128] = &[
     0x14ed774d389a2665d9e32ec187f79cf0,
 ];
 
+// Two rounds of AES as a mixer.
+//
+// This is included because there are an increasing number of hashes that use
+// AES intrinsics as their core bit mixing compontent.  There's nothing wrong
+// with that, but it's important to be aware that it's not magic, and a minimium
+// of three full rounds is needed to achieve full 128-bit diffusion.
 pub fn mix_input(in_bytes: &[u8], out_bytes: &mut [u8]) {
     assert!(in_bytes.len() == IN_SIZE_BYTES);
     assert!(out_bytes.len() == OUT_SIZE_BYTES);
@@ -28,8 +35,11 @@ pub fn mix_input(in_bytes: &[u8], out_bytes: &mut [u8]) {
             state = _mm_aesenc_si128(state, std::mem::transmute(KEYS[i]));
         }
 
-        // // Note: `_mm_aesenclast_si128()` doesn't do as much mixing as
-        // // `_mm_aesenc_si128()`.
+        // Note: `_mm_aesenclast_si128()` doesn't do as much mixing as
+        // `_mm_aesenc_si128()`.  Therfore uncommenting the line below dosen't
+        // fully diffuse the hash state after the two full rounds above, whereas
+        // simply doing another round of `_mm_aesenc_si128()` does.
+
         // state = _mm_aesenclast_si128(state, std::mem::transmute(KEYS[7]));
     }
 

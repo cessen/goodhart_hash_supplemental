@@ -7,5 +7,6 @@ pub mod meowhash;
 pub mod metrohash128;
 pub mod murmur3;
 pub mod skein;
+pub mod spookyhash2;
 pub mod tenthash;
 pub mod xxhash3;
