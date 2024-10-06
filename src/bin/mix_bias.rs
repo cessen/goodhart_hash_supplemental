@@ -97,8 +97,47 @@ const MIXERS: &[Mixer] = &[
     },
 ];
 
+struct BitPattern<'a> {
+    name: &'a str,
+    gen_function: &'a dyn Fn(usize, &mut [u8]),
+
+    /// Number of rounds to run the pattern with. Zero is treated specially, and
+    /// means to use the bit width of the input.
+    rounds: usize,
+}
+
+const PATTERNS: &[BitPattern] = &[
+    BitPattern {
+        name: "random",
+        gen_function: &generate_random,
+        rounds: 1 << 16,
+    },
+    BitPattern {
+        name: "counting",
+        gen_function: &generate_counting,
+        rounds: 1 << 16,
+    },
+    BitPattern {
+        name: "bit combinations",
+        gen_function: &generate_bit_combinations,
+        rounds: 1 << 16,
+    },
+    BitPattern {
+        name: "single-bit",
+        gen_function: &generate_single_1_bit,
+
+        // NOTE: because this test has a small, fixed number of rounds by its
+        // nature, the generated statistics should be interpreted a little
+        // differently. In particular, even a very good mixing function is
+        // unlikely to achieve "perfect" avalanche or BIC by this measure,
+        // purely because it's impossible to collect enough samples to reduce
+        // variance enough.
+        rounds: 0,
+    },
+];
+
 fn main() {
-    let mut do_avalanche = false;
+    let do_avalanche = true;
     let mut do_bic = false;
     let mut name_filters = Vec::new();
 
@@ -108,10 +147,10 @@ fn main() {
             continue;
         }
 
-        if arg == "--avalanche" {
-            do_avalanche = true;
-            continue;
-        }
+        // if arg == "--avalanche" {
+        //     do_avalanche = true;
+        //     continue;
+        // }
 
         if arg == "--bic" {
             do_bic = true;
@@ -119,13 +158,6 @@ fn main() {
         }
     }
 
-    // If no tests were selected, select them all.
-    if !do_avalanche && !do_bic {
-        do_avalanche = true;
-        do_bic = true;
-    }
-
-    // for (name, mixer, in_size, out_size, digest_size, rounds) in MIXERS.iter().copied() {
     for mixer in MIXERS.iter() {
         if !name_filters.is_empty() {
             let lower_name = mixer.name.to_lowercase();
@@ -140,82 +172,28 @@ fn main() {
 
         println!("\n================================");
         println!("{}", mixer.name);
-        println!("\nPattern: random");
-        let stats = compute_stats(
-            generate_random,
-            mixer.mix_function,
-            mixer.input_size,
-            mixer.output_size,
-            mixer.digest_size,
-            1 << 16,
-            do_avalanche,
-            do_bic,
-        );
-        stats.print_report();
-        if do_avalanche {
-            stats
-                .write_avalanche_png(&format!("{} - random.png", mixer.name))
-                .unwrap();
-        }
-
-        println!("\nPattern: counting");
-        let stats = compute_stats(
-            generate_counting,
-            mixer.mix_function,
-            mixer.input_size,
-            mixer.output_size,
-            mixer.digest_size,
-            1 << 16,
-            do_avalanche,
-            do_bic,
-        );
-        stats.print_report();
-        if do_avalanche {
-            stats
-                .write_avalanche_png(&format!("{} - counting.png", mixer.name))
-                .unwrap();
-        }
-
-        println!("\nPattern: bit combinations");
-        let stats = compute_stats(
-            generate_bit_combinations,
-            mixer.mix_function,
-            mixer.input_size,
-            mixer.output_size,
-            mixer.digest_size,
-            1 << 16,
-            do_avalanche,
-            do_bic,
-        );
-        stats.print_report();
-        if do_avalanche {
-            stats
-                .write_avalanche_png(&format!("{} - bit combinations.png", mixer.name))
-                .unwrap();
-        }
-
-        // NOTE: because this test has a small, fixed number of rounds by its
-        // nature, the generated statistics should be interpreted a little
-        // differently. In particular, even a very good mixing function is
-        // unlikely to achieve "perfect" avalanche by this measure, purely
-        // because it's impossible to collect enough samples to reduce variance
-        // enough.
-        println!("\nPattern: single-bit");
-        let stats = compute_stats(
-            generate_single_1_bit,
-            mixer.mix_function,
-            mixer.input_size,
-            mixer.output_size,
-            mixer.digest_size,
-            mixer.output_size * 8,
-            do_avalanche,
-            do_bic,
-        );
-        stats.print_report();
-        if do_avalanche {
-            stats
-                .write_avalanche_png(&format!("{} - single-bit.png", mixer.name))
-                .unwrap();
+        for pattern in PATTERNS.iter() {
+            println!("\nInput bit pattern: {}", pattern.name);
+            let stats = compute_stats(
+                pattern.gen_function,
+                mixer.mix_function,
+                mixer.input_size,
+                mixer.output_size,
+                mixer.digest_size,
+                if pattern.rounds == 0 {
+                    mixer.input_size * 8
+                } else {
+                    pattern.rounds
+                },
+                do_avalanche,
+                do_bic,
+            );
+            stats.print_report();
+            if do_avalanche {
+                stats
+                    .write_avalanche_png(&format!("{} - random.png", mixer.name))
+                    .unwrap();
+            }
         }
     }
 }
