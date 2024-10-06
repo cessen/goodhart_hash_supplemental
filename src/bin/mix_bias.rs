@@ -3,7 +3,10 @@ use lib::{
         aes, aquahash, cityhash128, fnv1a, goodhart, meowhash, metrohash128, murmur3, skein,
         tenthash, xxhash3,
     },
-    stats::{compute_stats, generate_counting, generate_random, generate_single_1_bit},
+    stats::{
+        compute_stats, generate_bit_combinations, generate_counting, generate_random,
+        generate_single_1_bit,
+    },
 };
 
 struct Mixer<'a> {
@@ -170,6 +173,24 @@ fn main() {
         if do_avalanche {
             stats
                 .write_avalanche_png(&format!("{} - counting.png", mixer.name))
+                .unwrap();
+        }
+
+        println!("\nPattern: bit combinations");
+        let stats = compute_stats(
+            generate_bit_combinations,
+            mixer.mix_function,
+            mixer.input_size,
+            mixer.output_size,
+            mixer.digest_size,
+            1 << 16,
+            do_avalanche,
+            do_bic,
+        );
+        stats.print_report();
+        if do_avalanche {
+            stats
+                .write_avalanche_png(&format!("{} - bit combinations.png", mixer.name))
                 .unwrap();
         }
 

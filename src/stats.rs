@@ -381,8 +381,8 @@ pub fn generate_random(seed: usize, bytes: &mut [u8]) {
 }
 
 /// Generates a byte stream with all zero bits except one.
-pub fn generate_single_1_bit(seed: usize, bytes: &mut [u8]) {
-    let bit_idx = seed % (bytes.len() * 8);
+pub fn generate_single_1_bit(index: usize, bytes: &mut [u8]) {
+    let bit_idx = index % (bytes.len() * 8);
     let i = bit_idx / 8;
     let byte = 1 << (bit_idx % 8);
     bytes.fill(0);
@@ -391,9 +391,64 @@ pub fn generate_single_1_bit(seed: usize, bytes: &mut [u8]) {
 
 /// Generates a byte stream with the lowest bits simply counting up as an
 /// incrementing integer.
-pub fn generate_counting(seed: usize, bytes: &mut [u8]) {
-    bytes[0..8].copy_from_slice(&u64::to_le_bytes(seed as u64));
+pub fn generate_counting(index: usize, bytes: &mut [u8]) {
+    bytes[0..8].copy_from_slice(&u64::to_le_bytes(index as u64));
     bytes[8..].fill(0);
+}
+
+/// Generates all combinations of setting zero bits, then one bit, then two
+/// bits, and so on, in that order.
+#[allow(dead_code)]
+pub fn generate_bit_combinations(index: usize, bytes: &mut [u8]) {
+    let bit_len = bytes.len() * 8;
+
+    fn binomial(n: usize, k: usize) -> usize {
+        if k > n {
+            return 0;
+        }
+
+        if k == 0 {
+            1
+        } else if k > (n / 2) {
+            binomial(n, n - k)
+        } else {
+            n * binomial(n - 1, k - 1) / k
+        }
+    }
+
+    // Compute the number of bits and the sub-index into that subsequence, for the
+    // given index.
+    let mut n = if bit_len < std::mem::size_of::<usize>() {
+        // Wrap to the total number of combinations if that's less than usize.
+        index % (1 << bit_len)
+    } else {
+        index
+    };
+    let mut bits = 0;
+    let mut combos = binomial(bit_len, bits);
+    while n >= combos {
+        n -= combos;
+        bits += 1;
+        combos = binomial(bit_len, bits);
+    }
+
+    // Generate the bits for the computed subsequence and sub-index.
+    bytes.fill(0);
+    let mut t = bit_len;
+    while t > 0 && bits > 0 {
+        let y = if t > bits { binomial(t - 1, bits) } else { 0 };
+
+        if n >= y {
+            let byte_idx = (t - 1) / 8;
+            let byte_mask = 1 << ((t - 1) % 8);
+            bytes[byte_idx] |= byte_mask;
+
+            n -= y;
+            bits -= 1;
+        }
+
+        t -= 1;
+    }
 }
 
 /// 64-bit bijective bit mixer.
