@@ -389,6 +389,19 @@ pub fn generate_single_1_bit(index: usize, bytes: &mut [u8]) {
     bytes[i] = byte;
 }
 
+/// Generates a byte stream with roughly 8 random bits set to one.
+pub fn generate_8_random_bits(seed: usize, bytes: &mut [u8]) {
+    let mut rng = WyRand::new_seed(mix64(seed as u64));
+
+    bytes.fill(0);
+    for _ in 0..8 {
+        let n = rng.generate_range(0..(bytes.len() * 8));
+        let byte_idx = n / 8;
+        let byte_mask = 1 << (n % 8);
+        bytes[byte_idx] |= byte_mask;
+    }
+}
+
 /// Generates a byte stream with the lowest bits simply counting up as an
 /// incrementing integer.
 pub fn generate_counting(index: usize, bytes: &mut [u8]) {
