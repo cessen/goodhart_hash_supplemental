@@ -301,6 +301,13 @@ where
     let mut output_tweaked = vec![0u8; output_size];
 
     for round in 0..rounds {
+        use std::io::Write;
+        print!(
+            "\r                                                  \rRound {}/{}",
+            round, rounds
+        );
+        let _ = std::io::stdout().flush();
+
         generate_input(round, &mut input[..]);
 
         mix(&input[..], &mut output[..]);
@@ -356,6 +363,8 @@ where
         chart.sample_count += 1;
     }
 
+    print!("\r                                                  \r");
+
     chart
 }
 
@@ -389,12 +398,12 @@ pub fn generate_single_1_bit(index: usize, bytes: &mut [u8]) {
     bytes[i] = byte;
 }
 
-/// Generates a byte stream with roughly 8 random bits set to one.
-pub fn generate_8_random_bits(seed: usize, bytes: &mut [u8]) {
-    let mut rng = WyRand::new_seed(mix64(seed as u64));
+/// Generates a byte stream with roughly `n` random bits set to one.
+pub fn generate_n_random_bits(seed: usize, bytes: &mut [u8], n: usize) {
+    let mut rng = WyRand::new_seed(mix64(seed as u64 ^ mix64(n as u64)));
 
     bytes.fill(0);
-    for _ in 0..8 {
+    for _ in 0..n {
         let n = rng.generate_range(0..(bytes.len() * 8));
         let byte_idx = n / 8;
         let byte_mask = 1 << (n % 8);
@@ -414,20 +423,6 @@ pub fn generate_counting(index: usize, bytes: &mut [u8]) {
 #[allow(dead_code)]
 pub fn generate_bit_combinations(index: usize, bytes: &mut [u8]) {
     let bit_len = bytes.len() * 8;
-
-    fn binomial(n: usize, k: usize) -> usize {
-        if k > n {
-            return 0;
-        }
-
-        if k == 0 {
-            1
-        } else if k > (n / 2) {
-            binomial(n, n - k)
-        } else {
-            n * binomial(n - 1, k - 1) / k
-        }
-    }
 
     // Compute the number of bits and the sub-index into that subsequence, for the
     // given index.
@@ -461,6 +456,20 @@ pub fn generate_bit_combinations(index: usize, bytes: &mut [u8]) {
         }
 
         t -= 1;
+    }
+}
+
+const fn binomial(n: usize, k: usize) -> usize {
+    if k > n {
+        return 0;
+    }
+
+    if k == 0 {
+        1
+    } else if k > (n / 2) {
+        binomial(n, n - k)
+    } else {
+        n * binomial(n - 1, k - 1) / k
     }
 }
 
