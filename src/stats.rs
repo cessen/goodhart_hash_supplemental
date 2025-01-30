@@ -418,6 +418,14 @@ pub fn generate_counting(index: usize, bytes: &mut [u8]) {
     bytes[8..].fill(0);
 }
 
+/// Generates a byte stream with the lowest bits simply iterating through gray
+/// codes in order.
+pub fn generate_gray_code(index: usize, bytes: &mut [u8]) {
+    let gray_code = index ^ (index >> 1);
+    bytes[0..8].copy_from_slice(&u64::to_le_bytes(gray_code as u64));
+    bytes[8..].fill(0);
+}
+
 /// Generates all combinations of setting zero bits, then one bit, then two
 /// bits, and so on, in that order.
 #[allow(dead_code)]

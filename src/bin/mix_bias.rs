@@ -5,8 +5,8 @@ use lib::{
         spookyhash2, tenthash, xxhash3,
     },
     stats::{
-        compute_stats, generate_bit_combinations, generate_counting, generate_n_random_bits,
-        generate_random, generate_single_1_bit,
+        compute_stats, generate_bit_combinations, generate_counting, generate_gray_code,
+        generate_n_random_bits, generate_random, generate_single_1_bit,
     },
 };
 
@@ -123,6 +123,11 @@ const PATTERNS: &[BitPattern] = &[
     BitPattern {
         name: "counting",
         gen_function: &generate_counting,
+        rounds: 1 << 16,
+    },
+    BitPattern {
+        name: "gray code",
+        gen_function: &generate_gray_code,
         rounds: 1 << 16,
     },
     BitPattern {
