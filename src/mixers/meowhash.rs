@@ -80,11 +80,11 @@ pub fn mix_input(in_bytes: &[u8], out_bytes: &mut [u8]) {
     // actually the fourth mix call that touches the final xmm slot, but it does
     // so before doing any mixing on that slot).  Since what we care about is
     // the complexity of inter-block bit relationships, that's what's needed
-    // here to be conservative.
+    // here to be minimally pessimistic.
     //
-    // Note that it's possible the situation is worse than this conservative
-    // test indicates--but asserting that would require more analysis than I
-    // have the energy for.
+    // Note that it's possible the situation is worse than this test indicates,
+    // but asserting that would require more analysis than I have the energy
+    // for.
     //
     // Regardless, it's a bit moot since an input block doesn't reach even close
     // to 128 bits of min diffusion within three mix calls anyway.  That takes
