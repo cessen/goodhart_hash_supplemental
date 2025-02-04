@@ -19,30 +19,42 @@ const KEYS: &[u128] = &[
     0x14ed774d389a2665d9e32ec187f79cf0,
 ];
 
-// Two rounds of AES as a mixer.
+// N rounds of AES as a mixer.
 //
 // This is included because there are an increasing number of hashes that use
 // AES intrinsics as their core bit mixing compontent.  There's nothing wrong
 // with that, but it's important to be aware that it's not magic, and a minimium
 // of three full rounds is needed to achieve full 128-bit diffusion.
-pub fn mix_input(in_bytes: &[u8], out_bytes: &mut [u8]) {
+pub fn mix_input(in_bytes: &[u8], out_bytes: &mut [u8], rounds: usize) {
     assert!(in_bytes.len() == IN_SIZE_BYTES);
     assert!(out_bytes.len() == OUT_SIZE_BYTES);
 
     let mut state: __m128i = unsafe { _mm_loadu_si128(in_bytes.as_ptr().cast()) };
     unsafe {
-        for i in 0..2 {
+        for i in 0..rounds {
             state = _mm_aesenc_si128(state, std::mem::transmute(KEYS[i]));
         }
 
         // Note: `_mm_aesenclast_si128()` doesn't do as much mixing as
         // `_mm_aesenc_si128()`.  Therfore uncommenting the line below dosen't
-        // fully diffuse the hash state after the two full rounds above, whereas
-        // simply doing another round of `_mm_aesenc_si128()` does.
+        // fully diffuse the hash state after doing two full rounds above,
+        // whereas simply doing another round of `_mm_aesenc_si128()` does.
 
         // state = _mm_aesenclast_si128(state, std::mem::transmute(KEYS[7]));
     }
 
     // Copy the mixed state to the output.
     out_bytes[0..16].copy_from_slice(&unsafe { std::mem::transmute::<_, [u8; 16]>(state) });
+}
+
+pub fn mix_input_1_round(in_bytes: &[u8], out_bytes: &mut [u8]) {
+    mix_input(in_bytes, out_bytes, 1);
+}
+
+pub fn mix_input_2_rounds(in_bytes: &[u8], out_bytes: &mut [u8]) {
+    mix_input(in_bytes, out_bytes, 2);
+}
+
+pub fn mix_input_3_rounds(in_bytes: &[u8], out_bytes: &mut [u8]) {
+    mix_input(in_bytes, out_bytes, 3);
 }
