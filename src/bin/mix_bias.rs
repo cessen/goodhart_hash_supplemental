@@ -139,11 +139,11 @@ const PATTERNS: &[BitPattern] = &[
         gen_function: &generate_counting,
         rounds: 1 << 16,
     },
-    BitPattern {
-        name: "gray code",
-        gen_function: &generate_gray_code,
-        rounds: 1 << 16,
-    },
+    // BitPattern {
+    //     name: "gray code",
+    //     gen_function: &generate_gray_code,
+    //     rounds: 1 << 16,
+    // },
     BitPattern {
         name: "bit combinations",
         gen_function: &generate_bit_combinations,
