@@ -38,7 +38,7 @@ impl Stats {
                 Vec::new()
             },
             bic_chart: if do_bic {
-                vec![[0; 4]; input_bit_len * (input_bit_len * (output_bit_len - 1))]
+                vec![[0; 4]; input_bit_len * output_bit_len * (output_bit_len - 1)]
             } else {
                 Vec::new()
             },
@@ -157,7 +157,7 @@ impl Stats {
     }
 
     pub fn row_bic_avg_deviation(&self, in_bit_idx: usize) -> f64 {
-        let stride = self.input_bit_len * (self.output_bit_len - 1);
+        let stride = self.output_bit_len * (self.output_bit_len - 1);
         let start = in_bit_idx * stride;
         let end = start + stride;
         let bic = &self.bic_chart[start..end];
@@ -169,7 +169,7 @@ impl Stats {
 
             sum += (max - min) as f64 / max as f64;
         }
-        sum / stride as f64
+        sum / (stride * self.sample_count) as f64
     }
 
     pub fn min_bic_deviation(&self) -> f64 {
@@ -194,6 +194,70 @@ impl Stats {
             n = n.max(self.row_bic_avg_deviation(i));
         }
         n
+    }
+
+    pub fn row_bic_avg_sorted_quadrants(&self, in_bit_idx: usize) -> [f64; 4] {
+        let stride = self.output_bit_len * (self.output_bit_len - 1);
+        let start = in_bit_idx * stride;
+        let end = start + stride;
+        let bic = &self.bic_chart[start..end];
+
+        let mut sum = [0; 4];
+        for mut quadrants in bic.iter().copied() {
+            quadrants.sort_unstable();
+            sum[0] += quadrants[0];
+            sum[1] += quadrants[1];
+            sum[2] += quadrants[2];
+            sum[3] += quadrants[3];
+        }
+
+        [
+            sum[0] as f64 / (stride * self.sample_count) as f64,
+            sum[1] as f64 / (stride * self.sample_count) as f64,
+            sum[2] as f64 / (stride * self.sample_count) as f64,
+            sum[3] as f64 / (stride * self.sample_count) as f64,
+        ]
+    }
+
+    pub fn avg_bic_sorted_quadrants(&self) -> [f64; 4] {
+        let mut sum = [0.0; 4];
+        for i in 0..self.input_bit_len {
+            let n = self.row_bic_avg_sorted_quadrants(i);
+            sum[0] += n[0];
+            sum[1] += n[1];
+            sum[2] += n[2];
+            sum[3] += n[3];
+        }
+
+        sum[0] /= self.input_bit_len as f64;
+        sum[1] /= self.input_bit_len as f64;
+        sum[2] /= self.input_bit_len as f64;
+        sum[3] /= self.input_bit_len as f64;
+
+        sum
+    }
+
+    pub fn worst_bic_sorted_quadrants(&self) -> [f64; 4] {
+        let mut worst = [999.0f64, 999.0, 999.0, 0.0];
+        for i in 0..self.input_bit_len {
+            let n = self.row_bic_avg_sorted_quadrants(i);
+            worst[0] = worst[0].min(n[0]);
+            worst[1] = worst[1].min(n[1]);
+            worst[2] = worst[2].min(n[2]);
+            worst[3] = worst[3].max(n[3]);
+        }
+        worst
+    }
+
+    pub fn best_bic_sorted_quadrants(&self) -> [f64; 4] {
+        let mut best = [0.0; 4];
+        for i in 0..self.input_bit_len {
+            let n = self.row_bic_avg_sorted_quadrants(i);
+            if n[0] > best[0] {
+                best = n;
+            }
+        }
+        best
     }
 
     pub fn print_report(&self) {
@@ -226,14 +290,27 @@ impl Stats {
         }
 
         if !self.bic_chart.is_empty() {
+            let worst = self.worst_bic_sorted_quadrants();
+            let avg = self.avg_bic_sorted_quadrants();
+            let best = self.best_bic_sorted_quadrants();
+
             println!(
-                "    BIC deviation:
-        Min: {:0.4}
-        Avg: {:0.4}
-        Max: {:0.4}",
-                self.min_bic_deviation(),
-                self.avg_bic_deviation(),
-                self.max_bic_deviation(),
+                "    BIC quadrants (sorted):
+        Wrst: [{:0.4}, {:0.4}, {:0.4}, {:0.4}]
+         Avg: [{:0.4}, {:0.4}, {:0.4}, {:0.4}]
+        Best: [{:0.4}, {:0.4}, {:0.4}, {:0.4}]",
+                worst[0],
+                worst[1],
+                worst[2],
+                worst[3],
+                avg[0],
+                avg[1],
+                avg[2],
+                avg[3],
+                best[0],
+                best[1],
+                best[2],
+                best[3],
             );
         }
     }
@@ -348,7 +425,7 @@ where
                         let only_left = flipped_a && !flipped_b;
                         let only_right = !flipped_a && flipped_b;
 
-                        let stride = (input_size * 8) * (output_size * 8 - 1);
+                        let stride = (output_size * 8) * (output_size * 8 - 1);
                         let k = (in_bit_idx * stride) + (i * (output_size * 8 - 1)) + j;
 
                         chart.bic_chart[k][0] += both as u32;
