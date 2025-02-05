@@ -20,7 +20,7 @@ struct Mixer<'a> {
 
 const MIXERS: &[Mixer] = &[
     Mixer {
-        name: "AES, 1 rounds",
+        name: "AES, 1 round",
         mix_function: &aes::mix_input_1_round,
         input_size: aes::IN_SIZE_BYTES,
         output_size: aes::OUT_SIZE_BYTES,
