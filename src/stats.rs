@@ -260,6 +260,51 @@ impl Stats {
         best
     }
 
+    /// Returns [0, 1], indicating the percent of entropy compared to the max
+    /// possible.
+    pub fn row_avg_bic_entropy(&self, in_bit_idx: usize) -> f64 {
+        let stride = self.output_bit_len * (self.output_bit_len - 1);
+        let start = in_bit_idx * stride;
+        let end = start + stride;
+        let bic = &self.bic_chart[start..end];
+
+        let mut sum = 0.0;
+        for quadrants in bic.iter() {
+            sum += entropy(&[
+                quadrants[0] as f64 / self.sample_count as f64,
+                quadrants[1] as f64 / self.sample_count as f64,
+                quadrants[2] as f64 / self.sample_count as f64,
+                quadrants[3] as f64 / self.sample_count as f64,
+            ]);
+        }
+
+        sum / stride as f64 / 2.0
+    }
+
+    pub fn min_bic_entropy(&self) -> f64 {
+        let mut n = 999.0_f64;
+        for i in 0..self.input_bit_len {
+            n = n.min(self.row_avg_bic_entropy(i));
+        }
+        n
+    }
+
+    pub fn avg_bic_entropy(&self) -> f64 {
+        let mut n = 0.0;
+        for i in 0..self.input_bit_len {
+            n += self.row_avg_bic_entropy(i);
+        }
+        n / self.input_bit_len as f64
+    }
+
+    pub fn max_bic_entropy(&self) -> f64 {
+        let mut n = 0.0_f64;
+        for i in 0..self.input_bit_len {
+            n = n.max(self.row_avg_bic_entropy(i));
+        }
+        n
+    }
+
     pub fn print_report(&self) {
         if !self.avalanche_chart.is_empty() {
             println!(
@@ -291,26 +336,32 @@ impl Stats {
 
         if !self.bic_chart.is_empty() {
             let worst = self.worst_bic_sorted_quadrants();
+            let worst_ent = self.min_bic_entropy();
             let avg = self.avg_bic_sorted_quadrants();
+            let avg_ent = self.avg_bic_entropy();
             let best = self.best_bic_sorted_quadrants();
+            let best_ent = self.max_bic_entropy();
 
             println!(
-                "    BIC quadrants (sorted):
-        Wrst: [{:0.4}, {:0.4}, {:0.4}, {:0.4}]
-         Avg: [{:0.4}, {:0.4}, {:0.4}, {:0.4}]
-        Best: [{:0.4}, {:0.4}, {:0.4}, {:0.4}]",
+                "    BIC quadrants (sorted) and entropy (in [0, 1]):
+       Worst: [{:0.4}, {:0.4}, {:0.4}, {:0.4}] ({:0.4})
+         Avg: [{:0.4}, {:0.4}, {:0.4}, {:0.4}] ({:0.4})
+        Best: [{:0.4}, {:0.4}, {:0.4}, {:0.4}] ({:0.4})",
                 worst[0],
                 worst[1],
                 worst[2],
                 worst[3],
+                worst_ent,
                 avg[0],
                 avg[1],
                 avg[2],
                 avg[3],
+                avg_ent,
                 best[0],
                 best[1],
                 best[2],
                 best[3],
+                best_ent,
             );
         }
     }
@@ -456,6 +507,17 @@ pub fn p_to_entropy(p: f64) -> f64 {
         let q = 1.0 - p;
         -(p * p.log2()) - (q * q.log2())
     }
+}
+
+pub fn entropy(outcome_probabilities: &[f64]) -> f64 {
+    let mut e = 0.0;
+    for &p in outcome_probabilities {
+        if p <= 0.0 || p >= 1.0 {
+            continue;
+        }
+        e += p * p.log2();
+    }
+    -e
 }
 
 //-------------------------------------------------------------
